@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Calculadora de Pena</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+      padding: 0;
+      background: #f5f5f5;
+    }
+    h1 {
+      font-size: 24px;
+    }
+    label, input, select, textarea, button {
+      display: block;
+      width: 100%;
+      margin-bottom: 15px;
+    }
+    input, select, textarea {
+      padding: 10px;
+      font-size: 16px;
+    }
+    button {
+      padding: 10px;
+      background-color: #007bff;
+      color: white;
+      font-weight: bold;
+      border: none;
+      border-radius: 5px;
+    }
+    #resultado {
+      background: white;
+      padding: 15px;
+      border: 1px solid #ccc;
+      margin-top: 20px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h1>Calculadora de Pena</h1>
+
+  <label> Pena Base (anos): <input type="number" id="penaBase" step="0.01"> </label>
+
+  <label> Máximo Legal (anos): <input type="number" id="maximoLegal" step="0.01"> </label>
+
+  <label> Agravantes (ex: reincidência, motivo torpe): <textarea id="agravantes"></textarea> </label>
+
+  <label> Atenuantes (ex: confissão, menoridade): <textarea id="atenuantes"></textarea> </label>
+
+  <label> Causas de Aumento (ex: concurso de agentes - 1/6): <textarea id="aumentos"></textarea> </label>
+
+  <label> Causas de Redução (ex: tentativa - 1/3): <textarea id="reducoes"></textarea> </label>
+
+  <label> Crime Hediondo? 
+    <select id="hediondo">
+      <option value="nao">Não</option>
+      <option value="sim">Sim</option>
+    </select>
+  </label>
+
+  <button onclick="calcularPena()">Calcular</button>
+  <button onclick="copiarRelatorio()">Copiar Relatório</button>
+
+  <div id="resultado"></div>
+
+  <script>
+    function aplicarFatores(pena, fatores, operacao = 'aumento') {
+      fatores = fatores.split('\n').map(f => f.trim()).filter(f => f !== '');
+      let explicacoes = [];
+      fatores.forEach(fator => {
+        let match = fator.match(/([0-9]+)\/([0-9]+)/);
+        if (match) {
+          let numerador = parseInt(match[1]);
+          let denominador = parseInt(match[2]);
+          let fracao = numerador / denominador;
+          let valor = pena * fracao;
+          pena = operacao === 'aumento' ? pena + valor : pena - valor;
+          explicacoes.push(`${operacao === 'aumento' ? 'Aumento' : 'Redução'} de ${numerador}/${denominador} (${(fracao * 100).toFixed(1)}%) → ${pena.toFixed(2)} anos`);
+        }
+      });
+      return { pena, explicacoes };
+    }
+
+    function calcularPena() {
+      let penaBase = parseFloat(document.getElementById('penaBase').value);
+      const maximo = parseFloat(document.getElementById('maximoLegal').value);
+      const agravantes = document.getElementById('agravantes').value.trim();
+      const atenuantes = document.getElementById('atenuantes').value.trim();
+      const aumentos = document.getElementById('aumentos').value.trim();
+      const reducoes = document.getElementById('reducoes').value.trim();
+      const hediondo = document.getElementById('hediondo').value;
+
+      if (isNaN(penaBase)) {
+        alert("Insira a pena base.");
+        return;
+      }
+
+      let relatorio = `🔹 Pena Base: ${penaBase.toFixed(2)} anos\n`;
+
+      if (agravantes) {
+        relatorio += `\n🔸 Agravantes:\n${agravantes}`;
+        penaBase += 1; // valor fictício, pode ser ajustado conforme necessidade
+        relatorio += `\n+1 ano → ${penaBase.toFixed(2)} anos`;
+      }
+
+      if (atenuantes) {
+        relatorio += `\n\n🔸 Atenuantes:\n${atenuantes}`;
+        penaBase -= 1;
+        relatorio += `\n-1 ano → ${penaBase.toFixed(2)} anos`;
+      }
+
+      if (aumentos) {
+        let { pena, explicacoes } = aplicarFatores(penaBase, aumentos, 'aumento');
+        relatorio += `\n\n🔸 Causas de Aumento:\n` + explicacoes.join('\n');
+        penaBase = pena;
+      }
+
+      if (reducoes) {
+        let { pena, explicacoes } = aplicarFatores(penaBase, reducoes, 'reducao');
+        relatorio += `\n\n🔸 Causas de Redução:\n` + explicacoes.join('\n');
+        penaBase = pena;
+      }
+
+      if (hediondo === "sim") {
+        relatorio += `\n\n🔒 Crime Hediondo: sim\n⚠️ Regime inicial: fechado, sem liberdade provisória (art. 2º, §1º da Lei 8.072/90)`;
+      }
+
+      if (!isNaN(maximo) && penaBase > maximo) {
+        relatorio += `\n\n⚠️ Pena excede o máximo legal (${maximo} anos), ajustando...`;
+        penaBase = maximo;
+      }
+
+      relatorio += `\n\n✅ Pena Final: ${penaBase.toFixed(2)} anos`;
+
+      document.getElementById("resultado").textContent = relatorio;
+    }
+
+    function copiarRelatorio() {
+      const resultado = document.getElementById("resultado").textContent;
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(resultado).then(() => alert("Relatório copiado!"));
+      } else {
+        // Fallback para iOS Safari
+        const textarea = document.createElement("textarea");
+        textarea.value = resultado;
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+          document.execCommand("copy");
+          alert("Relatório copiado!");
+        } catch (err) {
+          alert("Não foi possível copiar.");
+        }
+        document.body.removeChild(textarea);
+      }
+    }
+  </script>
+</body>
+</html>
+
+
